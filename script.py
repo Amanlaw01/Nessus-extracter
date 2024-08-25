@@ -77,6 +77,8 @@ def extract_details_by_keyword(files, keyword, output_file):
             print(f"Data successfully saved to {output_file}")
         else:
             print(f"No matches found for the keyword: '{keyword}'")
+            with open(output_file.replace('.xlsx', '_not_found.txt'), 'w') as f:
+                f.write(f"Vulnerability '{keyword}' does not exist in any of the provided .nessus files.")
 
     except ET.ParseError as e:
         print(f"Failed to parse a .nessus file: {e}")
@@ -85,12 +87,13 @@ def extract_details_by_keyword(files, keyword, output_file):
 
 # Example usage
 if __name__ == "__main__":
-    # List of .nessus file paths
-    nessus_files = input("Enter the paths to your .nessus files, separated by commas: ").split(',')
-    keyword = input("Enter the keyword to search (e.g., 'TLS'): ")
-    output_file = input("Enter the output Excel file path (e.g., 'output.xlsx'): ")
+    # Automatically find all .nessus files in the current directory
+    nessus_files = [f for f in os.listdir('.') if f.endswith('.nessus')]
+    
+    if not nessus_files:
+        print("No .nessus files found in the current directory.")
+    else:
+        keyword = input("Enter the keyword to search (e.g., 'TLS'): ")
+        output_file = input("Enter the output Excel file path (e.g., 'output.xlsx'): ")
 
-    # Strip any leading/trailing whitespace from file paths
-    nessus_files = [file.strip() for file in nessus_files]
-
-    extract_details_by_keyword(nessus_files, keyword, output_file)
+        extract_details_by_keyword(nessus_files, keyword, output_file)
