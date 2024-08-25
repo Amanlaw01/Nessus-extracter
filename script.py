@@ -13,6 +13,7 @@ def hash_file(file_path):
     return hasher.hexdigest()
 
 def list_vulnerabilities(files):
+    """List all unique vulnerabilities from the provided .nessus files."""
     vulnerabilities = {}
     severity_levels = {"4": "Critical", "3": "High", "2": "Medium", "1": "Low"}
     
@@ -31,29 +32,27 @@ def list_vulnerabilities(files):
 
             # Include only critical, high, medium, and low severity vulnerabilities
             if severity in severity_levels:
-                vulnerabilities[plugin_name] = severity_levels[severity]
+                if plugin_name not in vulnerabilities:
+                    vulnerabilities[plugin_name] = severity_levels[severity]
 
-    # Return a sorted list of unique plugin names without repetition
-    return sorted(vulnerabilities.keys())
+    return vulnerabilities
 
 def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
+    """Extract selected vulnerabilities from the provided .nessus files."""
     try:
         seen = set()
         extracted_data = []
         severity_levels = {"4": "Critical", "3": "High", "2": "Medium", "1": "Low"}
 
-        # Loop through each unique .nessus file
         for nessus_file in files:
             tree = ET.parse(nessus_file)
             root = tree.getroot()
 
             print(f"Processing file: {nessus_file}\n")
 
-            # Loop through each host in the report
             for report_host in root.findall('.//ReportHost'):
                 host_ip = report_host.attrib.get('name')
 
-                # Loop through each report item (vulnerability) in the host
                 for report_item in report_host.findall('.//ReportItem'):
                     plugin_name = report_item.attrib.get('pluginName')
                     port = report_item.attrib.get('port')
@@ -63,7 +62,6 @@ def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
                         seen.add((host_ip, port, plugin_name))
                         severity_str = severity_levels.get(severity, "Unknown")
 
-                        # Store the extracted data in the list
                         extracted_data.append({
                             "Host IP": host_ip,
                             "Port": port,
@@ -72,10 +70,7 @@ def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
                         })
 
         if extracted_data:
-            # Convert the list of dictionaries to a pandas DataFrame
             df = pd.DataFrame(extracted_data)
-            
-            # Save the DataFrame to an Excel file
             df.to_excel(output_file, index=False)
             print(f"Data successfully saved to {output_file}")
         else:
@@ -97,12 +92,16 @@ def choose_nessus_files():
     choice = input("Enter your choice (1 or 2): ").strip()
 
     if choice == "1":
-        return [f for f in os.listdir('.') if f.endswith('.nessus')]
+        files = [f for f in os.listdir('.') if f.endswith('.nessus')]
+        print(f"Automatically selected files: {files}")
+        return files
     elif choice == "2":
         root = Tk()
         root.withdraw()  # Hide the root window
         file_paths = filedialog.askopenfilenames(title="Select .nessus files", filetypes=[("Nessus Files", "*.nessus")])
-        return list(file_paths)
+        files = list(file_paths)
+        print(f"Manually selected files: {files}")
+        return files
     else:
         print("Invalid choice. Please select 1 or 2.")
         return choose_nessus_files()
@@ -119,13 +118,13 @@ if __name__ == "__main__":
 
         if vulnerabilities:
             print("\nAvailable Vulnerabilities (Plugin Names):")
-            for i, v in enumerate(vulnerabilities, 1):
-                print(f"{i}. {v}")
+            for i, (plugin_name, severity) in enumerate(vulnerabilities.items(), 1):
+                print(f"{i}. {plugin_name} (Severity: {severity})")
 
             # Prompt the user to select plugin names
             selected_indices = input("\nEnter the numbers of the plugin names you want to extract, separated by commas (e.g., 1, 3, 5): ")
             selected_indices = [int(i.strip()) for i in selected_indices.split(',') if i.strip().isdigit()]
-            selected_plugin_names = [vulnerabilities[i-1] for i in selected_indices if 0 < i <= len(vulnerabilities)]
+            selected_plugin_names = [list(vulnerabilities.keys())[i-1] for i in selected_indices if 0 < i <= len(vulnerabilities)]
 
             if selected_plugin_names:
                 output_file = input("\nEnter the output Excel file path (e.g., 'vulnerabilities_report.xlsx'): ")
