@@ -3,6 +3,22 @@ import os
 import hashlib
 import pandas as pd
 from tkinter import Tk, filedialog
+import glob
+
+# Banner
+banner = '''
+ ,---.    .--.     .---. ,---.  .-. .-.,---.     .---.   .---. .-. .-.   .---. 
+ | .-'   / /\\ \\   ( .-._)| .-'  |  \\| || .-'    ( .-._) ( .-._)| | | |  ( .-._)
+ | `-.  / /__\\ \\ (_) \\   | `-.  |   | || `-.   (_) \\   (_) \\   | | | | (_) \\   
+ | .-'  |  __  | _  \\ \\  | .-'  | |\\  || .-'   _  \\ \\  _  \\ \\  | | | | _  \\ \\  
+ |  `--.| |  |)|( `-'  ) |  `--.| | |)||  `--.( `-'  )( `-'  ) | `-')|( `-'  ) 
+ /( __.'|_|  (_) `----'  /( __.'/(  (_)/( __.' `----'  `----'  `---(_) `----'  
+(__)                    (__)   (__)   (__)                                     
+
+Author: SpongyYeti
+'''
+
+print(banner)
 
 def hash_file(file_path):
     """Generate a SHA-256 hash of the file content."""
@@ -92,7 +108,8 @@ def choose_nessus_files():
     choice = input("Enter your choice (1 or 2): ").strip()
 
     if choice == "1":
-        files = [f for f in os.listdir('.') if f.endswith('.nessus')]
+        # Automatically find all .nessus files in the current directory
+        files = glob.glob(os.path.join(os.getcwd(), '*.nessus'))
         print(f"Automatically selected files: {files}")
         return files
     elif choice == "2":
