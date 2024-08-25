@@ -4,7 +4,7 @@ To run this script download the script file in your machine and run it with pyth
 #
 For linux user: python scripty.py
 #
-Note: When selecting files manually press 'ctrl + S' to select multiple file
+Note: When selecting multiple files manually press 'ctrl + S' to select multiple file
 #
 To select all the listed vulnerability type "all".
 #
