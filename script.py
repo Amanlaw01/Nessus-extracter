@@ -123,6 +123,48 @@ def choose_nessus_files():
         print("Invalid choice. Please select 1 or 2.")
         return choose_nessus_files()
 
+def merge_vulnerabilities(files, selected_plugin_names):
+    """Merge selected vulnerabilities into one entry with IP and Port details."""
+    seen = set()
+    merged_data = []
+    severity_levels = {"4": "Critical", "3": "High", "2": "Medium", "1": "Low"}
+
+    for nessus_file in files:
+        tree = ET.parse(nessus_file)
+        root = tree.getroot()
+
+        for report_host in root.findall('.//ReportHost'):
+            host_ip = report_host.attrib.get('name')
+
+            for report_item in report_host.findall('.//ReportItem'):
+                plugin_name = report_item.attrib.get('pluginName')
+                port = report_item.attrib.get('port')
+                severity = report_item.attrib.get('severity')
+
+                if plugin_name in selected_plugin_names:
+                    if (host_ip, port) not in seen:
+                        seen.add((host_ip, port))
+                        merged_data.append({
+                            "Host IP": host_ip,
+                            "Port": port,
+                            "Plugin Name": plugin_name,
+                            "Severity": severity_levels.get(severity, "Unknown")
+                        })
+                    else:
+                        # Append the plugin name and severity for existing IP and Port
+                        for data in merged_data:
+                            if data["Host IP"] == host_ip and data["Port"] == port:
+                                data["Plugin Name"] += f"\n{plugin_name}"
+                                data["Severity"] += f", {severity_levels.get(severity, 'Unknown')}"
+                                break
+
+    if merged_data:
+        df = pd.DataFrame(merged_data)
+        return df
+    else:
+        print("No data found for the selected vulnerabilities.")
+        return None
+
 # Example usage
 if __name__ == "__main__":
     nessus_files = choose_nessus_files()
@@ -138,15 +180,32 @@ if __name__ == "__main__":
             for i, (plugin_name, severity) in enumerate(vulnerabilities.items(), 1):
                 print(f"{i}. {plugin_name} (Severity: {severity})")
 
-            # Prompt the user to select plugin names
-            selected_indices = input("\nEnter the numbers of the plugin names you want to extract, separated by commas (e.g., 1, 3, 5): ")
-            selected_indices = [int(i.strip()) for i in selected_indices.split(',') if i.strip().isdigit()]
-            selected_plugin_names = [list(vulnerabilities.keys())[i-1] for i in selected_indices if 0 < i <= len(vulnerabilities)]
+            # Ask the user if they want to merge vulnerabilities
+            merge_choice = input("\nDo you want to merge any vulnerabilities together? (yes or no): ").strip().lower()
+            if merge_choice == 'yes':
+                selected_indices = input("\nEnter the numbers of the plugin names you want to merge, separated by commas (e.g., 1, 3): ")
+                selected_indices = [int(i.strip()) - 1 for i in selected_indices.split(',') if i.strip().isdigit()]
+                selected_plugin_names = [list(vulnerabilities.keys())[i] for i in selected_indices if 0 <= i < len(vulnerabilities)]
 
-            if selected_plugin_names:
-                output_file = input("\nEnter the output Excel file path (e.g., 'vulnerabilities_report.xlsx'): ")
-                extract_selected_vulnerabilities(nessus_files, selected_plugin_names, output_file)
+                if selected_plugin_names:
+                    merged_df = merge_vulnerabilities(nessus_files, selected_plugin_names)
+                    
+                    if merged_df is not None:
+                        output_file = input("\nEnter the output Excel file path for merged vulnerabilities (e.g., 'vulnerabilities_merged_report.xlsx'): ")
+                        merged_df.to_excel(output_file, index=False)
+                        print(f"Merged vulnerabilities saved to {output_file}")
+                else:
+                    print("No valid selections made.")
             else:
-                print("No valid selections made.")
+                # Prompt the user to select plugin names
+                selected_indices = input("\nEnter the numbers of the plugin names you want to extract, separated by commas (e.g., 1, 3, 5): ")
+                selected_indices = [int(i.strip()) for i in selected_indices.split(',') if i.strip().isdigit()]
+                selected_plugin_names = [list(vulnerabilities.keys())[i-1] for i in selected_indices if 0 < i <= len(vulnerabilities)]
+
+                if selected_plugin_names:
+                    output_file = input("\nEnter the output Excel file path for extracted vulnerabilities (e.g., 'vulnerabilities_report.xlsx'): ")
+                    extract_selected_vulnerabilities(nessus_files, selected_plugin_names, output_file)
+                else:
+                    print("No valid selections made.")
         else:
             print("No vulnerabilities with the specified severity levels found in the provided .nessus files.")
