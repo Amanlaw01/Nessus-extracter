@@ -175,9 +175,12 @@ def merge_vulnerabilities(files, selected_plugin_names):
         return None
 
 def parse_selection(selection, total_items):
-    """Parse user selection for individual numbers, ranges, and back option."""
+    """Parse user selection for individual numbers, ranges, and special keywords."""
     if selection.lower() == 'exit':
         exit()
+
+    if selection.lower() == 'all':
+        return list(range(total_items))
 
     selected_indices = set()
     parts = selection.split(',')
@@ -221,7 +224,7 @@ if __name__ == "__main__":
 
             # Ask the user if they want to merge vulnerabilities
             while True:
-                merge_choice = input("\nDo you want to merge any vulnerabilities together? (y/n or ** to go back, exit to quit): ").strip().lower()
+                merge_choice = input("\nDo you want to merge any vulnerabilities together? (y/n or ** to go back): ").strip().lower()
                 if merge_choice == 'y':
                     while True:
                         selected_indices = input("\nEnter the numbers or ranges (e.g., 1-3) of the plugin names you want to merge, or '**' to go back: ")
