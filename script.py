@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 import os
 import hashlib
 import pandas as pd
+from tkinter import Tk, filedialog
 
 def hash_file(file_path):
     """Generate a SHA-256 hash of the file content."""
@@ -11,34 +12,38 @@ def hash_file(file_path):
         hasher.update(buf)
     return hasher.hexdigest()
 
-def extract_details_by_keywords(files, keywords, output_file):
+def list_vulnerabilities(files):
+    vulnerabilities = {}
+    severity_levels = {"4": "Critical", "3": "High", "2": "Medium", "1": "Low"}
+    
+    for nessus_file in files:
+        if not os.path.exists(nessus_file):
+            print(f"File not found: {nessus_file}")
+            continue
+
+        tree = ET.parse(nessus_file)
+        root = tree.getroot()
+
+        # Loop through each report item (vulnerability) in the host
+        for report_item in root.findall('.//ReportItem'):
+            plugin_name = report_item.attrib.get('pluginName')
+            severity = report_item.attrib.get('severity')
+
+            # Include only critical, high, medium, and low severity vulnerabilities
+            if severity in severity_levels:
+                vulnerabilities[plugin_name] = severity_levels[severity]
+
+    # Return a sorted list of unique plugin names without repetition
+    return sorted(vulnerabilities.keys())
+
+def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
     try:
-        # Set to keep track of seen (IP, port, plugin_name) combinations across all files
         seen = set()
-        matches_found = False
-
-        # List to store extracted data
         extracted_data = []
-
-        # Process unique files
-        processed_hashes = set()
-        unique_files = []
-
-        for nessus_file in files:
-            if not os.path.exists(nessus_file):
-                print(f"File not found: {nessus_file}")
-                continue
-
-            # Hash the file to check for duplicates
-            file_hash = hash_file(nessus_file)
-            if file_hash not in processed_hashes:
-                processed_hashes.add(file_hash)
-                unique_files.append(nessus_file)
-            else:
-                print(f"Duplicate file removed: {nessus_file}")
+        severity_levels = {"4": "Critical", "3": "High", "2": "Medium", "1": "Low"}
 
         # Loop through each unique .nessus file
-        for nessus_file in unique_files:
+        for nessus_file in files:
             tree = ET.parse(nessus_file)
             root = tree.getroot()
 
@@ -52,23 +57,21 @@ def extract_details_by_keywords(files, keywords, output_file):
                 for report_item in report_host.findall('.//ReportItem'):
                     plugin_name = report_item.attrib.get('pluginName')
                     port = report_item.attrib.get('port')
+                    severity = report_item.attrib.get('severity')
 
-                    # Create a tuple to check for duplicates
-                    identifier = (host_ip, port, plugin_name)
-
-                    # Check if any of the keywords match the plugin name and is not a duplicate
-                    if any(keyword.lower() in plugin_name.lower() for keyword in keywords) and identifier not in seen:
-                        matches_found = True
-                        seen.add(identifier)  # Add to seen set
+                    if plugin_name in selected_plugin_names and (host_ip, port, plugin_name) not in seen:
+                        seen.add((host_ip, port, plugin_name))
+                        severity_str = severity_levels.get(severity, "Unknown")
 
                         # Store the extracted data in the list
                         extracted_data.append({
                             "Host IP": host_ip,
                             "Port": port,
-                            "Plugin Name": plugin_name
+                            "Plugin Name": plugin_name,
+                            "Severity": severity_str
                         })
 
-        if matches_found:
+        if extracted_data:
             # Convert the list of dictionaries to a pandas DataFrame
             df = pd.DataFrame(extracted_data)
             
@@ -76,27 +79,58 @@ def extract_details_by_keywords(files, keywords, output_file):
             df.to_excel(output_file, index=False)
             print(f"Data successfully saved to {output_file}")
         else:
-            print(f"No matches found for the provided keywords.")
+            print("No selected vulnerabilities found.")
             with open(output_file.replace('.xlsx', '_not_found.txt'), 'w') as f:
-                f.write(f"No vulnerabilities matching the provided keywords were found in any of the provided .nessus files.")
+                f.write("No vulnerabilities matching the selected plugin names were found in the provided .nessus files.")
 
     except ET.ParseError as e:
         print(f"Failed to parse a .nessus file: {e}")
     except Exception as e:
         print(f"An error occurred: {e}")
 
+def choose_nessus_files():
+    """Prompt the user to choose `.nessus` files manually or automatically."""
+    print("Choose an option to select `.nessus` files:")
+    print("1. Automatically select all `.nessus` files from the current directory")
+    print("2. Manually select `.nessus` files")
+
+    choice = input("Enter your choice (1 or 2): ").strip()
+
+    if choice == "1":
+        return [f for f in os.listdir('.') if f.endswith('.nessus')]
+    elif choice == "2":
+        root = Tk()
+        root.withdraw()  # Hide the root window
+        file_paths = filedialog.askopenfilenames(title="Select .nessus files", filetypes=[("Nessus Files", "*.nessus")])
+        return list(file_paths)
+    else:
+        print("Invalid choice. Please select 1 or 2.")
+        return choose_nessus_files()
+
 # Example usage
 if __name__ == "__main__":
-    # Automatically find all .nessus files in the current directory
-    nessus_files = [f for f in os.listdir('.') if f.endswith('.nessus')]
+    nessus_files = choose_nessus_files()
     
     if not nessus_files:
-        print("No .nessus files found in the current directory.")
+        print("No .nessus files selected.")
     else:
-        # Allow user to input multiple keywords separated by commas
-        keywords = input("Enter keywords separated by commas (e.g., 'TLS, SSH, Sweet32'): ").split(',')
-        keywords = [kw.strip() for kw in keywords if kw.strip()]
+        # List all unique vulnerabilities (plugin names) with specific severities
+        vulnerabilities = list_vulnerabilities(nessus_files)
 
-        output_file = input("Enter the output Excel file path (e.g., 'vulnerabilities_report.xlsx'): ")
+        if vulnerabilities:
+            print("\nAvailable Vulnerabilities (Plugin Names):")
+            for i, v in enumerate(vulnerabilities, 1):
+                print(f"{i}. {v}")
 
-        extract_details_by_keywords(nessus_files, keywords, output_file)
+            # Prompt the user to select plugin names
+            selected_indices = input("\nEnter the numbers of the plugin names you want to extract, separated by commas (e.g., 1, 3, 5): ")
+            selected_indices = [int(i.strip()) for i in selected_indices.split(',') if i.strip().isdigit()]
+            selected_plugin_names = [vulnerabilities[i-1] for i in selected_indices if 0 < i <= len(vulnerabilities)]
+
+            if selected_plugin_names:
+                output_file = input("\nEnter the output Excel file path (e.g., 'vulnerabilities_report.xlsx'): ")
+                extract_selected_vulnerabilities(nessus_files, selected_plugin_names, output_file)
+            else:
+                print("No valid selections made.")
+        else:
+            print("No vulnerabilities with the specified severity levels found in the provided .nessus files.")
