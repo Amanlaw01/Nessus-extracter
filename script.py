@@ -11,7 +11,7 @@ def hash_file(file_path):
         hasher.update(buf)
     return hasher.hexdigest()
 
-def extract_details_by_keyword(files, keyword, output_file):
+def extract_details_by_keywords(files, keywords, output_file):
     try:
         # Set to keep track of seen (IP, port, plugin_name) combinations across all files
         seen = set()
@@ -56,8 +56,8 @@ def extract_details_by_keyword(files, keyword, output_file):
                     # Create a tuple to check for duplicates
                     identifier = (host_ip, port, plugin_name)
 
-                    # Check if the plugin name contains the keyword and is not a duplicate
-                    if keyword.lower() in plugin_name.lower() and identifier not in seen:
+                    # Check if any of the keywords match the plugin name and is not a duplicate
+                    if any(keyword.lower() in plugin_name.lower() for keyword in keywords) and identifier not in seen:
                         matches_found = True
                         seen.add(identifier)  # Add to seen set
 
@@ -76,9 +76,9 @@ def extract_details_by_keyword(files, keyword, output_file):
             df.to_excel(output_file, index=False)
             print(f"Data successfully saved to {output_file}")
         else:
-            print(f"No matches found for the keyword: '{keyword}'")
+            print(f"No matches found for the provided keywords.")
             with open(output_file.replace('.xlsx', '_not_found.txt'), 'w') as f:
-                f.write(f"Vulnerability '{keyword}' does not exist in any of the provided .nessus files.")
+                f.write(f"No vulnerabilities matching the provided keywords were found in any of the provided .nessus files.")
 
     except ET.ParseError as e:
         print(f"Failed to parse a .nessus file: {e}")
@@ -93,7 +93,10 @@ if __name__ == "__main__":
     if not nessus_files:
         print("No .nessus files found in the current directory.")
     else:
-        keyword = input("Enter the keyword to search (e.g., 'TLS'): ")
-        output_file = input("Enter the output Excel file path (e.g., 'output.xlsx'): ")
+        # Allow user to input multiple keywords separated by commas
+        keywords = input("Enter keywords separated by commas (e.g., 'TLS, SSH, Sweet32'): ").split(',')
+        keywords = [kw.strip() for kw in keywords if kw.strip()]
 
-        extract_details_by_keyword(nessus_files, keyword, output_file)
+        output_file = input("Enter the output Excel file path (e.g., 'vulnerabilities_report.xlsx'): ")
+
+        extract_details_by_keywords(nessus_files, keywords, output_file)
