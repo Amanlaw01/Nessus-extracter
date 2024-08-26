@@ -67,6 +67,12 @@ def list_vulnerabilities(files):
 
     return vulnerabilities
 
+def ensure_excel_extension(file_path):
+    """Ensure the file path ends with .xlsx extension."""
+    if not file_path.lower().endswith('.xlsx'):
+        file_path += '.xlsx'
+    return file_path
+
 def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
     """Extract selected vulnerabilities from the provided .nessus files."""
     try:
@@ -101,8 +107,7 @@ def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
 
         if extracted_data:
             df = pd.DataFrame(extracted_data)
-            if not output_file.lower().endswith('.xlsx'):
-                output_file += '.xlsx'
+            output_file = ensure_excel_extension(output_file)
             df.to_excel(output_file, index=False)
             print(f"Data successfully saved to {output_file}")
         else:
@@ -257,9 +262,11 @@ if __name__ == "__main__":
 
             if action_choice == "1":
                 output_file = input("Enter the output file path (including .xlsx): ").strip()
+                output_file = ensure_excel_extension(output_file)
                 extract_selected_vulnerabilities(nessus_files, selected_plugins, output_file)
             elif action_choice == "2":
                 output_file = input("Enter the output file path (including .xlsx): ").strip()
+                output_file = ensure_excel_extension(output_file)
                 merged_df = merge_vulnerabilities(nessus_files, selected_plugins)
                 if merged_df is not None:
                     merged_df.to_excel(output_file, index=False)
