@@ -102,7 +102,8 @@ def extract_selected_vulnerabilities(files, selected_plugin_names, output_file):
                             "Host IP": host_ip,
                             "Port": port,
                             "Plugin Name": plugin_name,
-                            "Severity": severity_str
+                            "Severity": severity_str,
+                            "Source File": os.path.basename(nessus_file)  # Add the source file column
                         })
 
         if extracted_data:
@@ -176,7 +177,8 @@ def merge_vulnerabilities(files, selected_plugin_names):
                             "Host IP": host_ip,
                             "Port": port,
                             "Plugin Name": plugin_name,
-                            "Severity": severity_levels.get(severity, "Unknown")
+                            "Severity": severity_levels.get(severity, "Unknown"),
+                            "Source File": os.path.basename(nessus_file)  # Add the source file column
                         })
                     else:
                         # Append the plugin name and severity for existing IP and Port
@@ -184,6 +186,7 @@ def merge_vulnerabilities(files, selected_plugin_names):
                             if data["Host IP"] == host_ip and data["Port"] == port:
                                 data["Plugin Name"] += f"\n{plugin_name}"
                                 data["Severity"] += f", {severity_levels.get(severity, 'Unknown')}"
+                                data["Source File"] += f", {os.path.basename(nessus_file)}"  # Append the source file name
                                 break
 
     if merged_data:
@@ -221,62 +224,68 @@ def parse_selection(selection, total_items):
                 if 0 <= index < total_items:
                     selected_indices.add(index)
             except ValueError:
-                print(f"Invalid number format: {part}")
+                print(f"Invalid selection format: {part}")
 
-    return sorted(selected_indices)
+    return list(selected_indices)
 
-# Example usage
-if __name__ == "__main__":
+def select_vulnerabilities(vulnerabilities):
+    """Allow the user to manually select vulnerabilities by plugin name."""
+    if not vulnerabilities:
+        print("No vulnerabilities to select from.")
+        return []
+
+    selected_plugin_names = []
+    sorted_vulnerabilities = sorted(vulnerabilities.items(), key=lambda x: list(vulnerabilities.keys()).index(x[0]))
+
+    print("Select vulnerabilities by entering the corresponding numbers (e.g., 1,3-5):")
+    for i, (plugin_name, severity) in enumerate(sorted_vulnerabilities):
+        print(f"{i + 1}. {plugin_name} (Severity: {severity})")
+
+    print("Enter 'all' to select all vulnerabilities.")
+    print("Enter 'exit' to exit the script.")
+    selection = input("Your selection: ").strip().lower()
+
+    selected_indices = parse_selection(selection, len(vulnerabilities))
+    if not selected_indices:
+        print("No valid selection made.")
+        return []
+
+    for i in selected_indices:
+        selected_plugin_names.append(sorted_vulnerabilities[i][0])
+
+    return selected_plugin_names
+
+def main():
     while True:
         nessus_files = choose_nessus_files()
         if not nessus_files:
-            print("No .nessus files selected or user chose to go back.")
             continue
-        
-        # List all unique vulnerabilities (plugin names) and allow user to select
+
         vulnerabilities = list_vulnerabilities(nessus_files)
+        if not vulnerabilities:
+            print("No vulnerabilities found.")
+            continue
 
-        if vulnerabilities:
-            print("\nSelect vulnerabilities to extract or merge:")
-            for i, (plugin_name, severity) in enumerate(vulnerabilities.items(), 1):
-                print(f"{i}. {plugin_name} [{severity}]")
-            print("Enter the numbers (comma-separated or range) of the vulnerabilities you want to select,")
-            print("or type 'all' to select all vulnerabilities, '**' to go back, 'exit' to quit.")
+        selected_plugin_names = select_vulnerabilities(vulnerabilities)
 
-            selection = input("Your selection: ").strip().lower()
-            selected_indices = parse_selection(selection, len(vulnerabilities))
-            
-            if not selected_indices:
-                print("Invalid selection. Please try again.")
-                continue
-            
-            selected_plugins = [list(vulnerabilities.keys())[i] for i in selected_indices]
-
-            print("\nChoose an action:")
-            print("1. Extract the selected vulnerabilities into a new .xlsx file")
-            print("2. Merge selected vulnerabilities by IP and port into a new .xlsx file")
-            print("**. Back")
-            print("exit. Exit the script")
-
-            action_choice = input("Enter your choice (1, 2, **, or exit): ").strip().lower()
-
-            if action_choice == "1":
-                output_file = input("Enter the output file path (including .xlsx): ").strip()
+        merge_option = input("Do you want to merge any vulnerabilities into one entry with multiple plugin names (yes/no)? ").strip().lower()
+        if merge_option == "yes":
+            merged_df = merge_vulnerabilities(nessus_files, selected_plugin_names)
+            if merged_df is not None:
+                output_file = input("Enter the output Excel file name (without extension): ")
                 output_file = ensure_excel_extension(output_file)
-                extract_selected_vulnerabilities(nessus_files, selected_plugins, output_file)
-            elif action_choice == "2":
-                output_file = input("Enter the output file path (including .xlsx): ").strip()
-                output_file = ensure_excel_extension(output_file)
-                merged_df = merge_vulnerabilities(nessus_files, selected_plugins)
-                if merged_df is not None:
-                    merged_df.to_excel(output_file, index=False)
-                    print(f"Merged data saved to {output_file}")
-            elif action_choice == "**":
-                continue
-            elif action_choice == "exit":
-                print("Exiting the script.")
-                exit()
-            else:
-                print("Invalid choice. Please select 1, 2, **, or exit.")
+                merged_output_file = output_file.replace('.xlsx', '_merged.xlsx')
+                merged_df.to_excel(merged_output_file, index=False)
+                print(f"Merged data successfully saved to {merged_output_file}")
         else:
-            print("No vulnerabilities found in the selected files.")
+            output_file = input("Enter the output Excel file name (without extension): ")
+            output_file = ensure_excel_extension(output_file)
+            extract_selected_vulnerabilities(nessus_files, selected_plugin_names, output_file)
+
+        next_step = input("Do you want to process another set of files (yes/no)? ").strip().lower()
+        if next_step != "yes":
+            print("Exiting the script.")
+            break
+
+if __name__ == "__main__":
+    main()
