@@ -100,6 +100,7 @@ def extract_vulnerabilities_by_plugin(files, plugin_names):
             extracted_data.append({
                 "Plugin Name": plugin_name,
                 "Severity": severity_str,
+                "IP Count": len(set(ip_list)),  # Number of unique IP addresses
                 "IP Addresses": ', '.join(set(ip_list)),
                 "Ports": ', '.join(set(port_list))
             })
