@@ -107,6 +107,30 @@ def extract_vulnerabilities_by_plugin(files, plugin_names):
 
     return extracted_data
 
+def merge_vulnerabilities(extracted_data):
+    """Merge vulnerabilities by consolidating IP addresses and ports for each plugin."""
+    merged_data = {}
+    for data in extracted_data:
+        plugin_name = data["Plugin Name"]
+        if plugin_name not in merged_data:
+            merged_data[plugin_name] = {
+                "Severity": data["Severity"],
+                "IP Addresses": set(data["IP Addresses"].split(', ')),
+                "Ports": set(data["Ports"].split(', ')),
+                "IP Count": data["IP Count"]
+            }
+        else:
+            merged_data[plugin_name]["IP Addresses"].update(data["IP Addresses"].split(', '))
+            merged_data[plugin_name]["Ports"].update(data["Ports"].split(', '))
+            merged_data[plugin_name]["IP Count"] = len(merged_data[plugin_name]["IP Addresses"])
+
+    # Convert sets to comma-separated strings
+    for plugin_name, data in merged_data.items():
+        data["IP Addresses"] = ', '.join(data["IP Addresses"])
+        data["Ports"] = ', '.join(data["Ports"])
+    
+    return [dict({"Plugin Name": k, **v}) for k, v in merged_data.items()]
+
 def choose_nessus_files():
     """Prompt the user to choose `.nessus` files manually or automatically."""
     while True:
@@ -209,12 +233,17 @@ def main():
             continue
 
         selected_plugin_names = select_vulnerabilities(vulnerabilities)
-
+        
         if selected_plugin_names:
+            merge_choice = input("Do you want to merge vulnerabilities (yes/no)? ").strip().lower()
             output_file = input("Enter the output Excel file name (without extension): ").strip()
             output_file = ensure_excel_extension(output_file)
 
             extracted_data = extract_vulnerabilities_by_plugin(nessus_files, selected_plugin_names)
+            
+            if merge_choice == "yes":
+                extracted_data = merge_vulnerabilities(extracted_data)
+                
             df = pd.DataFrame(extracted_data)
             df.to_excel(output_file, index=False)
             print(f"Data successfully saved to {output_file}")
