@@ -7,6 +7,6 @@ Instead of manually reviewing hundreds or thousands of findings, EaseNessus cons
 Whether you're conducting a penetration test, vulnerability assessment, or security audit, EaseNessus helps reduce repetitive work and improve reporting efficiency.
 
 Installation
-https://github.com/aman-ghale/EaseNessus.git
+https://github.com/aman-ghale/EaseNessus.git /n
 cd EaseNessus
 python easenessus.py
