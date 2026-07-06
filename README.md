@@ -6,10 +6,7 @@ Instead of manually reviewing hundreds or thousands of findings, EaseNessus cons
 
 Whether you're conducting a penetration test, vulnerability assessment, or security audit, EaseNessus helps reduce repetitive work and improve reporting efficiency.
 
-#Technologies Used
-Python
-XML Parsing
-Tkinter (GUI)
-Nessus XML Report Format
-
 Installation
+https://github.com/aman-ghale/EaseNessus.git
+cd EaseNessus
+python easenessus.py
