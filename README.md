@@ -1,4 +1,4 @@
-#Overview
+Overview
 
 EaseNessus is a Python-based application that streamlines the analysis of Nessus (.nessus) vulnerability scan reports.
 
@@ -13,5 +13,3 @@ Tkinter (GUI)
 Nessus XML Report Format
 
 Installation
-
-
